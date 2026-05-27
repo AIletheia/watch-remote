@@ -3,48 +3,93 @@
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Task Remote</title>
-  <!-- Load Espruino's Web Bluetooth Library -->
   <script src="https://www.puck-js.com/puck.js"></script>
   <style>
-    body { font-family: sans-serif; background: #111; color: white; padding: 20px; text-align: center; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 30px; }
-    button { padding: 20px; border-radius: 10px; border: none; font-size: 16px; font-weight: bold; color: white; }
+    body { font-family: sans-serif; background: #111; color: white; padding: 0; margin: 0; text-align: center; }
+    #banner { padding: 15px; font-weight: bold; font-size: 18px; transition: background 0.3s; }
+    .disconnected { background: #dc3545; }
+    .connected { background: #28a745; }
+    .container { padding: 20px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+    button { padding: 20px; border-radius: 10px; border: none; font-size: 16px; font-weight: bold; color: white; opacity: 1; transition: opacity 0.2s; }
+    button:disabled { opacity: 0.3; pointer-events: none; }
     .preset { background: #333; }
     .green { background: #28a745; width: 100%; margin-bottom: 15px;}
     .red { background: #dc3545; width: 100%; margin-bottom: 15px;}
-    .blue { background: #007bff; width: 100%; margin-bottom: 15px;}
-    h2 { border-bottom: 1px solid #444; padding-bottom: 10px; }
+    .blue { background: #007bff; }
+    h2 { border-bottom: 1px solid #444; padding-bottom: 10px; margin-top: 20px;}
   </style>
 </head>
 <body>
 
-  <h2>Quick Launch (Zone 1)</h2>
-  <div class="grid">
-    <button class="preset" onclick="sendCmd('cmdStartTask(\'Routine\', 15, 2)')">Morning Routine<br>15m | 2★</button>
-    <button class="preset" onclick="sendCmd('cmdStartTask(\'Homework\', 30, 3)')">Homework<br>30m | 3★</button>
-    <button class="preset" onclick="sendCmd('cmdStartTask(\'Clean\', 10, 1)')">Tidy Room<br>10m | 1★</button>
-    <button class="preset" onclick="sendCmd('cmdStartTask(\'Bonus\', 2, 1)')">Earn-Back<br>2m | 1★</button>
-  </div>
+  <div id="banner" class="disconnected">Status: Disconnected</div>
 
-  <h2>Assessment & Instant (Zone 2)</h2>
-  <div class="grid">
-    <button class="green" onclick="sendCmd('cmdAssess(true)')">Verify: PASS</button>
-    <button class="red" onclick="sendCmd('cmdAssess(false)')">Verify: FAIL</button>
+  <div class="container">
+    <div class="grid">
+      <button id="btnConnect" class="blue" onclick="connectWatch()">Connect</button>
+      <button id="btnDisconnect" class="blue" onclick="disconnectWatch()" disabled>Disconnect</button>
+    </div>
+
+    <h2>Quick Launch (Zone 1)</h2>
+    <div class="grid">
+      <button class="preset task-btn" onclick="sendCmd('cmdStartTask(\'Routine\', 15, 2)')" disabled>Morning Routine<br>15m | 2★</button>
+      <button class="preset task-btn" onclick="sendCmd('cmdStartTask(\'Homework\', 30, 3)')" disabled>Homework<br>30m | 3★</button>
+      <button class="preset task-btn" onclick="sendCmd('cmdStartTask(\'Clean\', 10, 1)')" disabled>Tidy Room<br>10m | 1★</button>
+      <button class="preset task-btn" onclick="sendCmd('cmdStartTask(\'Bonus\', 2, 1)')" disabled>Earn-Back<br>2m | 1★</button>
+    </div>
+
+    <h2>Assessment & Instant (Zone 2)</h2>
+    <div class="grid">
+      <button class="green task-btn" onclick="sendCmd('cmdAssess(true)')" disabled>Verify: PASS</button>
+      <button class="red task-btn" onclick="sendCmd('cmdAssess(false)')" disabled>Verify: FAIL</button>
+    </div>
+    <button class="green task-btn" onclick="sendCmd('cmdInstantStar(1)')" disabled>+1 Instant Star</button>
+    <button class="red task-btn" onclick="sendCmd('cmdInstantStar(-1)')" disabled>-1 Instant Star</button>
   </div>
-  <button class="green" onclick="sendCmd('cmdInstantStar(1)')">+1 Instant Star</button>
-  <button class="red" onclick="sendCmd('cmdInstantStar(-1)')">-1 Instant Star</button>
 
   <script>
-    // Send a command to the Bangle.js over Web Bluetooth
-    function sendCmd(cmd) {
-      // Puck.write automatically handles connection and disconnection
-      Puck.write(cmd + ";\n", function(result) {
-        if (result === null) {
-          alert("Connection failed. Ensure Bangle is nearby and unlocked.");
+    let connection = null;
+
+    function updateUI(isConnected) {
+      let banner = document.getElementById('banner');
+      banner.className = isConnected ? "connected" : "disconnected";
+      banner.innerText = isConnected ? "Status: Connected" : "Status: Disconnected";
+      
+      document.getElementById('btnConnect').disabled = isConnected;
+      document.getElementById('btnDisconnect').disabled = !isConnected;
+
+      let taskButtons = document.querySelectorAll('.task-btn');
+      taskButtons.forEach(btn => btn.disabled = !isConnected);
+    }
+
+    function connectWatch() {
+      Puck.connect(function(c) {
+        if (!c) {
+          alert("Couldn't connect. Ensure watch is unlocked and nearby.");
+          return;
         }
+        connection = c;
+        updateUI(true);
+        
+        // Listen for accidental disconnects (e.g., walking out of range)
+        connection.on("close", function() {
+          connection = null;
+          updateUI(false);
+        });
       });
     }
-  </script>
 
+    function disconnectWatch() {
+      if (connection) {
+        connection.close();
+      }
+    }
+
+    function sendCmd(cmd) {
+      if (!connection) return;
+      // Send the command directly over the open connection
+      connection.write(cmd + ";\n");
+    }
+  </script>
 </body>
 </html>
