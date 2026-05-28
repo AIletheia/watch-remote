@@ -5,11 +5,13 @@
   <title>Task Remote</title>
   <script src="https://www.puck-js.com/puck.js"></script>
   <style>
-    body { font-family: sans-serif; background: #111; color: white; padding: 0; margin: 0; text-align: center; display: flex; flex-direction: column; min-height: 100vh;}
-    #banner { padding: 15px; font-weight: bold; font-size: 18px; transition: background 0.3s; }
+    body { font-family: sans-serif; background: #111; color: white; padding: 0; margin: 0; text-align: center; overflow: hidden; height: 100vh;}
+    #banner { padding: 15px; font-weight: bold; font-size: 18px; transition: background 0.3s; width: 100%; z-index: 10;}
     .disconnected { background: #dc3545; }
     .connected { background: #28a745; }
-    .container { padding: 20px; flex: 1; }
+    
+    /* Make container scrollable but leave footer fixed */
+    .container { padding: 20px; padding-bottom: 60px; height: calc(100vh - 80px); overflow-y: auto; box-sizing: border-box; }
     
     /* Layouts */
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
@@ -29,8 +31,8 @@
     #liveTaskName { font-size: 24px; color: #aaa; }
     h2 { border-bottom: 1px solid #444; padding-bottom: 10px; margin-top: 20px;}
     
-    /* Footer */
-    #footer { padding: 10px; background: #222; font-size: 12px; color: #777; margin-top: auto;}
+    /* Pinned Footer */
+    #footer { position: fixed; bottom: 0; left: 0; width: 100%; padding: 10px 0; background: #222; font-size: 12px; color: #777; z-index: 10;}
   </style>
 </head>
 <body>
@@ -72,11 +74,20 @@
     </div>
   </div>
   
-  <div id="footer">V3.0 - Debug Build</div>
+  <div id="footer">V4.0 - Layout & Nav Fixes</div>
 
   <script>
     let connection = null;
     let lineBuffer = "";
+
+    // Warn before page reload breaks connection
+    window.addEventListener("beforeunload", function (e) {
+      if (connection) {
+        var confirmationMessage = 'Refreshing will disconnect the watch. Are you sure?';
+        (e || window.event).returnValue = confirmationMessage;
+        return confirmationMessage;
+      }
+    });
 
     function updateUI(isConnected) {
       let banner = document.getElementById('banner');
@@ -102,7 +113,6 @@
       }
     }
 
-    // Fortified JSON parser to prevent crashes from fragmented Bluetooth packets
     function handleTelemetry(data) {
       let dashView = document.getElementById('view-dashboard');
       let taskView = document.getElementById('view-task');
@@ -140,14 +150,13 @@
         connection = c;
         updateUI(true);
         
-        // Robust buffer listener
         connection.on("data", function(d) {
           lineBuffer += d;
           let lines = lineBuffer.split("\n");
-          lineBuffer = lines.pop(); // keep incomplete line in buffer
+          lineBuffer = lines.pop(); 
           
           lines.forEach(line => {
-            line = line.trim(); // Strip invisible \r characters
+            line = line.trim(); 
             if (line.startsWith("{") && line.endsWith("}")) {
               try {
                 let msg = JSON.parse(line);
