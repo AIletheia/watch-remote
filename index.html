@@ -10,13 +10,23 @@
     .disconnected { background: #dc3545; }
     .connected { background: #28a745; }
     .container { padding: 20px; }
+    
+    /* Layouts */
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
-    button { padding: 20px; border-radius: 10px; border: none; font-size: 16px; font-weight: bold; color: white; opacity: 1; transition: opacity 0.2s; }
+    .hidden { display: none !important; }
+    
+    /* Buttons */
+    button { padding: 20px; border-radius: 10px; border: none; font-size: 16px; font-weight: bold; color: white; transition: opacity 0.2s; }
     button:disabled { opacity: 0.3; pointer-events: none; }
     .preset { background: #333; }
     .green { background: #28a745; width: 100%; margin-bottom: 15px;}
     .red { background: #dc3545; width: 100%; margin-bottom: 15px;}
-    .blue { background: #007bff; }
+    .blue { background: #007bff; width: 100%; margin-bottom: 15px;}
+    .gold { background: #ffc107; color: black; width: 100%; margin-bottom: 15px;}
+    
+    /* Task Screen specifics */
+    #liveTimer { font-size: 60px; font-weight: bold; margin: 20px 0; font-family: monospace;}
+    #liveTaskName { font-size: 24px; color: #aaa; }
     h2 { border-bottom: 1px solid #444; padding-bottom: 10px; margin-top: 20px;}
   </style>
 </head>
@@ -26,29 +36,43 @@
 
   <div class="container">
     <div class="grid">
-      <button id="btnConnect" class="blue" onclick="connectWatch()">Connect</button>
-      <button id="btnDisconnect" class="blue" onclick="disconnectWatch()" disabled>Disconnect</button>
+      <button id="btnConnect" class="blue" onclick="connectWatch()" style="margin:0;">Connect</button>
+      <button id="btnDisconnect" class="blue" onclick="disconnectWatch()" style="margin:0;" disabled>Disconnect</button>
     </div>
 
-    <h2>Quick Launch (Zone 1)</h2>
-    <div class="grid">
-      <button class="preset task-btn" onclick="sendCmd('cmdStartTask(\'Routine\', 15, 2)')" disabled>Morning Routine<br>15m | 2★</button>
-      <button class="preset task-btn" onclick="sendCmd('cmdStartTask(\'Homework\', 30, 3)')" disabled>Homework<br>30m | 3★</button>
-      <button class="preset task-btn" onclick="sendCmd('cmdStartTask(\'Clean\', 10, 1)')" disabled>Tidy Room<br>10m | 1★</button>
-      <button class="preset task-btn" onclick="sendCmd('cmdStartTask(\'Bonus\', 2, 1)')" disabled>Earn-Back<br>2m | 1★</button>
+    <div id="view-dashboard">
+      <h2>Quick Launch</h2>
+      <div class="grid">
+        <button class="preset task-btn" onclick="sendCmd('cmdStartTask(\'Routine\', 15, 2)')" disabled>Morning Routine<br>15m | 2★</button>
+        <button class="preset task-btn" onclick="sendCmd('cmdStartTask(\'Homework\', 30, 3)')" disabled>Homework<br>30m | 3★</button>
+        <button class="preset task-btn" onclick="sendCmd('cmdStartTask(\'Clean\', 10, 1)')" disabled>Tidy Room<br>10m | 1★</button>
+        <button class="preset task-btn" onclick="sendCmd('cmdStartTask(\'Bonus\', 2, 1)')" disabled>Earn-Back<br>2m | 1★</button>
+      </div>
+
+      <h2 id="assessmentHeader">Assessment & Instant</h2>
+      <div class="grid">
+        <button class="green task-btn" onclick="sendCmd('cmdAssess(true, false)')" disabled>Verify: PASS</button>
+        <button class="red task-btn" onclick="sendCmd('cmdAssess(false, false)')" disabled>Verify: FAIL</button>
+      </div>
+      <button class="green task-btn" onclick="sendCmd('cmdInstantStar(1)')" disabled>+1 Instant Star</button>
+      <button class="red task-btn" onclick="sendCmd('cmdInstantStar(-1)')" disabled>-1 Instant Star</button>
     </div>
 
-    <h2>Assessment & Instant (Zone 2)</h2>
-    <div class="grid">
-      <button class="green task-btn" onclick="sendCmd('cmdAssess(true)')" disabled>Verify: PASS</button>
-      <button class="red task-btn" onclick="sendCmd('cmdAssess(false)')" disabled>Verify: FAIL</button>
+    <div id="view-task" class="hidden">
+      <h2 style="color: #00ff00;">Task Active</h2>
+      <div id="liveTaskName">Loading...</div>
+      <div id="liveTimer">00:00</div>
+      
+      <button class="green" onclick="sendCmd('cmdAssess(true, false)')">Early Finish<br>(Claim Base Reward)</button>
+      <button class="gold" onclick="sendCmd('cmdAssess(true, true)')">Early Finish + BONUS<br>(Claim Base + 1★)</button>
+      <button class="red" onclick="sendCmd('cmdAssess(false, false)')" style="margin-top: 20px;">Abort Task / Fail</button>
     </div>
-    <button class="green task-btn" onclick="sendCmd('cmdInstantStar(1)')" disabled>+1 Instant Star</button>
-    <button class="red task-btn" onclick="sendCmd('cmdInstantStar(-1)')" disabled>-1 Instant Star</button>
+
   </div>
 
   <script>
     let connection = null;
+    let lineBuffer = "";
 
     function updateUI(isConnected) {
       let banner = document.getElementById('banner');
@@ -60,18 +84,70 @@
 
       let taskButtons = document.querySelectorAll('.task-btn');
       taskButtons.forEach(btn => btn.disabled = !isConnected);
+      
+      // Reset view if disconnected
+      if (!isConnected) {
+        document.getElementById('view-dashboard').classList.remove('hidden');
+        document.getElementById('view-task').classList.add('hidden');
+      }
+    }
+
+    // Process incoming JSON from the watch
+    function handleTelemetry(data) {
+      let dashView = document.getElementById('view-dashboard');
+      let taskView = document.getElementById('view-task');
+
+      if (data.state === "TASK") {
+        // Show Active Task View
+        dashView.classList.add('hidden');
+        taskView.classList.remove('hidden');
+        
+        document.getElementById('liveTaskName').innerText = data.taskName + " (Reward: " + data.potentialReward + "★)";
+        
+        let m = Math.floor(data.timeRemaining / 60);
+        let s = data.timeRemaining % 60;
+        document.getElementById('liveTimer').innerText = m + ":" + ("0"+s).substr(-2);
+      } 
+      else if (data.state === "STANDBY" || data.state === "PENDING") {
+        // Show Dashboard View
+        taskView.classList.add('hidden');
+        dashView.classList.remove('hidden');
+        
+        if(data.state === "PENDING") {
+          document.getElementById('assessmentHeader').innerText = "PENDING ASSESSMENT!";
+          document.getElementById('assessmentHeader').style.color = "#ffff00";
+        } else {
+          document.getElementById('assessmentHeader').innerText = "Assessment & Instant";
+          document.getElementById('assessmentHeader').style.color = "white";
+        }
+      }
     }
 
     function connectWatch() {
       Puck.connect(function(c) {
         if (!c) {
-          alert("Couldn't connect. Ensure watch is unlocked and nearby.");
+          alert("Couldn't connect. Ensure watch is unlocked and disconnected from PC.");
           return;
         }
         connection = c;
         updateUI(true);
         
-        // Listen for accidental disconnects (e.g., walking out of range)
+        // Listen for live data from the watch
+        connection.on("data", function(d) {
+          lineBuffer += d;
+          let lines = lineBuffer.split("\n");
+          lineBuffer = lines.pop(); // keep incomplete line
+          
+          lines.forEach(line => {
+            if (line.startsWith("{")) {
+              try {
+                let msg = JSON.parse(line);
+                handleTelemetry(msg);
+              } catch(e) { console.log("JSON Parse Error", e); }
+            }
+          });
+        });
+
         connection.on("close", function() {
           connection = null;
           updateUI(false);
@@ -87,7 +163,6 @@
 
     function sendCmd(cmd) {
       if (!connection) return;
-      // Send the command directly over the open connection
       connection.write(cmd + ";\n");
     }
   </script>
