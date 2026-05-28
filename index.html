@@ -69,7 +69,7 @@
     </div>
   </div>
   
-  <div id="footer">V6.0 - Immediate Sync & BG Colors</div>
+  <div id="footer">V13.0 - Visual Target Grid</div>
 
   <script>
     let connection = null;
@@ -101,9 +101,17 @@
     }
 
     function askForTarget() {
-      let t = prompt("Enter the new Star Target:", "20");
+      let maxStars = 30; // 5x6 visual grid limitation
+      let t = prompt("Enter the new Star Target (Max " + maxStars + "):", "20");
       if (t !== null && !isNaN(t) && t.trim() !== "") {
-        sendCmd('cmdSetTarget(' + parseInt(t) + ')');
+        let parsed = parseInt(t);
+        if (parsed > maxStars) {
+          alert("The watch can only display a maximum of " + maxStars + " stars on a single screen. Setting target to " + maxStars + ".");
+          parsed = maxStars;
+        } else if (parsed < 1) {
+          parsed = 1;
+        }
+        sendCmd('cmdSetTarget(' + parsed + ')');
       }
     }
 
