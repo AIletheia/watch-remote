@@ -10,14 +10,11 @@
     .disconnected { background: #dc3545; }
     .connected { background: #28a745; }
     
-    /* Make container scrollable but leave footer fixed */
     .container { padding: 20px; padding-bottom: 60px; height: calc(100vh - 80px); overflow-y: auto; box-sizing: border-box; }
     
-    /* Layouts */
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
     .hidden { display: none !important; }
     
-    /* Buttons */
     button { padding: 20px; border-radius: 10px; border: none; font-size: 16px; font-weight: bold; color: white; transition: opacity 0.2s; }
     button:disabled { opacity: 0.3; pointer-events: none; }
     .preset { background: #333; }
@@ -26,12 +23,10 @@
     .blue { background: #007bff; width: 100%; margin-bottom: 15px;}
     .gold { background: #ffc107; color: black; width: 100%; margin-bottom: 15px;}
     
-    /* Task Screen specifics */
     #liveTimer { font-size: 60px; font-weight: bold; margin: 20px 0; font-family: monospace;}
     #liveTaskName { font-size: 24px; color: #aaa; }
     h2 { border-bottom: 1px solid #444; padding-bottom: 10px; margin-top: 20px;}
     
-    /* Pinned Footer */
     #footer { position: fixed; bottom: 0; left: 0; width: 100%; padding: 10px 0; background: #222; font-size: 12px; color: #777; z-index: 10;}
   </style>
 </head>
@@ -74,13 +69,12 @@
     </div>
   </div>
   
-  <div id="footer">V4.0 - Layout & Nav Fixes</div>
+  <div id="footer">V5.0 - Comms Crash Fix</div>
 
   <script>
     let connection = null;
     let lineBuffer = "";
 
-    // Warn before page reload breaks connection
     window.addEventListener("beforeunload", function (e) {
       if (connection) {
         var confirmationMessage = 'Refreshing will disconnect the watch. Are you sure?';
